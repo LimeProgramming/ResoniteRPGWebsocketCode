@@ -54,8 +54,11 @@ class WebsocketServerAssignee:
     state = State.DISCONNECT
     
 
+    # ============================== Core Functions ==============================
+
     def __init__(self, websocket):
         self.websocket = websocket
+
 
     async def send(self, message):
         """Send messages to our clients"""
@@ -64,6 +67,7 @@ class WebsocketServerAssignee:
             await self.websocket.send(message)
         except:
             traceback.print_exc()
+
 
     async def recv(self) -> str:
         """Get messages from our clients"""
@@ -74,26 +78,10 @@ class WebsocketServerAssignee:
         except:
             traceback.print_exc()
 
-    async def connect_to_db(self):
-        """Establish a connection to the PostgreSQL database when a client connects."""
 
-        try:
-            if self.connection_type == ConnectionType.PRODUCTION:
-                self.db_conn = await asyncpg.connect(**dblogin.DBCRED)
-            else:
-                self.db_conn = await asyncpg.connect(**dblogin.TESTDBCRED)
-
-            for type in ("json", "jsonb"):
-                await self.db_conn.set_type_codec(type, encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
-
-        except Exception as e:
-            traceback.print_exc()
-            await aprint("Failed to connect to database")
-            await aprint(e)
-            return False
-        
-        return True
     
+    # ============================== Listeners ==============================
+
     async def welcome(self) -> bool:
         """First function called when a new client connects to our server. 
 
@@ -163,6 +151,7 @@ class WebsocketServerAssignee:
 
         return True
     
+
     async def listener(self):
         """This is our main listener thread for our clients"""
 
@@ -213,50 +202,10 @@ class WebsocketServerAssignee:
             traceback.print_exc()
             await unregister_client(self)
             
-            
-    async def run_cmd_echo(self, args):
-        return
 
 
-    async def close(self):
-        """Close the client connection and the database connection"""
 
-        self.state = State.DISCONNECT
-
-        try:
-            # Close the database connection
-            if self.db_conn: 
-                await self.db_conn.close()
-
-            # Close the websocket
-            await self.websocket.close()
-        except:
-            traceback.print_exc()
-
-    async def cmd_packet_analysis(self, msg, length=2, delim=None) -> tuple:
-        """
-        Checks if the Command received is valid
-
-        Returns:
-            tuple: (is_valid (bool), command (str), argument (str))
-        """
-        
-        cmdpack = [x for x in msg.split(delim) if x]
-
-        if len(cmdpack) == length:
-            return True, cmdpack[0], cmdpack[1] 
-        else:
-            return False, cmdpack[0], ''
-        
-
-    # ============================== Database Commands ==============================
-
-    async def run_cmd_echo(self, args):
-        """This the echo command, just send back what the client said"""
-
-        await self.send(f"echoλ{args}")
-
-        return
+    # ============================== RPG Loader Commands ==============================
 
     async def run_cmd_saveplayer(self, args):
         """Save player data to database"""
@@ -268,6 +217,15 @@ class WebsocketServerAssignee:
         #round(answer, 2))
 
         return
+
+    
+    async def run_cmd_echo(self, args):
+        """This the echo command, just send back what the client said"""
+
+        await self.send(f"echoλ{args}")
+
+        return
+
 
     async def run_cmd_loadplayer(self, player_id):
         """Read player data from database"""
@@ -324,7 +282,66 @@ class WebsocketServerAssignee:
         return
 
 
+    async def cmd_packet_analysis(self, msg, length=2, delim=None) -> tuple:
+        """
+        Checks if the Command received is valid
 
+        Returns:
+            tuple: (is_valid (bool), command (str), argument (str))
+        """
+        
+        cmdpack = [x for x in msg.split(delim) if x]
+
+        if len(cmdpack) == length:
+            return True, cmdpack[0], cmdpack[1] 
+        else:
+            return False, cmdpack[0], ''
+        
+
+
+    # ============================== Untility Functions ==============================
+
+    async def connect_to_db(self):
+        """Establish a connection to the PostgreSQL database when a client connects."""
+
+        try:
+            if self.connection_type == ConnectionType.PRODUCTION:
+                self.db_conn = await asyncpg.connect(**dblogin.DBCRED)
+            else:
+                self.db_conn = await asyncpg.connect(**dblogin.TESTDBCRED)
+
+            for type in ("json", "jsonb"):
+                await self.db_conn.set_type_codec(type, encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
+
+        except Exception as e:
+            traceback.print_exc()
+            await aprint("Failed to connect to database")
+            await aprint(e)
+            return False
+        
+        return True
+    
+
+    async def close(self):
+        """Close the client connection and the database connection"""
+
+        self.state = State.DISCONNECT
+
+        try:
+            # Close the database connection
+            if self.db_conn: 
+                await self.db_conn.close()
+
+            # Close the websocket
+            await self.websocket.close()
+        except:
+            traceback.print_exc()
+
+
+
+# ===============================================================================
+#                    ~~~~~~~~~~~~~~~ End Of Class ~~~~~~~~~~~~~~~ 
+# ===============================================================================
 
 
 
