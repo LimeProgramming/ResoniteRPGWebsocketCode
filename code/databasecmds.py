@@ -80,14 +80,74 @@ class DatabaseCmds(object):
             LOWER(reso_id) = LOWER(CAST($1 AS VARCHAR))
     """
 
-    WORLD_DATA_EXISTS =         "SELECT EXISTS(SELECT world_data->>LOWER(CAST($1 AS VARCHAR)) FROM public.players WHERE LOWER(reso_id) = LOWER(CAST($2 AS VARCHAR)));"
-    FETCH_WORLD_DATA =          "SELECT world_data FROM public.players WHERE LOWER(reso_id) = LOWER(CAST($1 AS VARCHAR));"
     PLAYER_EXISTS =             "SELECT EXISTS(SELECT ply_num FROM public.players WHERE LOWER(reso_id) = LOWER(CAST($1 AS VARCHAR)));"
-
-
-
+    EXISTS_WORLD_DATA =         "SELECT hasWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+    FETCH_WORLD_DATA =          "SELECT getWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+    
 
 
     FETCH_PLAYER_INVENTORY =    "SELECT inventory FROM public.players WHERE reso_id = CAST($1 as VARCHAR);"
     FETCH_PLAYER_ALL =          "SELECT * FROM public.players WHERE reso_id = CAST($1 AS VARCHAR);"
     FETCH_PLAYER =              "SELECT reso_id, world_data, health, hit_multi, attack, agility FROM public.players WHERE reso_id = CAST($1 AS VARCHAR);"
+
+
+
+
+
+
+    # ============================== ~~~~~~~~~ ==============================
+    # ============================== FUNCTIONS ==============================
+    # ============================== ~~~~~~~~~ ==============================
+    
+    
+    # -------------------- HAS WORLD INFO --------------------
+    CREATE_FUNC_HASWORLDINFO = """
+    DO
+    $do$
+    BEGIN
+        IF NOT EXISTS(
+            SELECT 1 FROM pg_proc WHERE prorettype <> 0 AND proname = 'hasworldinfo'
+        ) THEN 
+            CREATE FUNCTION hasWorldInfo(player_id VARCHAR, world VARCHAR) 
+            RETURNS BOOLEAN AS
+            $$
+            BEGIN
+                RETURN EXISTS(
+                    SELECT 1 FROM public.players 
+                    WHERE LOWER(reso_id) = LOWER(player_id)
+                    AND world_data->>world IS NOT NULL
+                );
+            END;
+            $$ LANGUAGE plpgsql COST 100;
+        END IF;
+    END
+    $do$
+    """
+
+    EXISTS_FUNC_HASWORLDINFO= "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE prorettype <> 0 AND proname = 'hasworldinfo');"
+
+    # -------------------- GET WORLD INFO --------------------
+    CREATE_FUNC_GETWORLDINFO = """
+    DO
+    $do$
+    BEGIN
+        IF NOT EXISTS(
+            SELECT 1 FROM pg_proc WHERE prorettype <> 0 AND proname = 'getworldinfo'
+        )THEN 
+            CREATE FUNCTION getWorldInfo(player_id VARCHAR, world VARCHAR) 
+            RETURNS JSONB AS
+            $$
+            BEGIN
+                RETURN (
+                    SELECT world_data->>world 
+                    FROM public.players
+                    WHERE LOWER(reso_id) = LOWER(player_id)
+                    );
+            END;
+            $$ LANGUAGE plpgsql COST 100;
+        END IF;
+    END
+    $do$
+    """
+
+    EXISTS_FUNC_GETWORLDINFO= "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE prorettype <> 0 AND proname = 'getworldinfo');"

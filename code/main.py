@@ -15,7 +15,7 @@ import traceback
 
 # ~~~===== Custom lib imports =====~~~ #
 import dblogin
-from util import aprint
+from util import aprint, lprint
 from databasecmds import DatabaseCmds as pgCmds
 from WSASS import register_client, ws_heartbeat
 
@@ -57,22 +57,81 @@ async def pgdb_setup_database() -> bool:
         {'exists':'EXISTS_PLRS_TABLE',          'create':'CREATE_PLRS_TABLE',           'log':'Created Players table.'}
     ]
 
+    database_functions = [
+        {'exists':'EXISTS_FUNC_GETWORLDINFO',   'create':'CREATE_FUNC_GETWORLDINFO',    'log':'Created GET WORLD INFO Function.'},
+        {'exists':'EXISTS_FUNC_HASWORLDINFO',   'create':'CREATE_FUNC_HASWORLDINFO',    'log':'Created HAS WORLD INFO Function.'}
+    ]
 
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ### ===== Production Database
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    ### ===== Create Tables
     for dbTables in database_tables:
         if not await db_conn.fetchval(getattr(pgCmds, dbTables['exists'])):
             await db_conn.execute(getattr(pgCmds, dbTables['create']))
             await aprint(f" {dbTables['log']}")
 
-    #### ===== Test Database
+    
+     ### ===== Create Functions
+    for dbfuncs in database_functions:
+        if not await db_conn.fetchval(getattr(pgCmds, dbfuncs['exists'])):
+            await db_conn.execute(getattr(pgCmds, dbfuncs['create']))
+            await aprint(f" {dbfuncs['log']}")
+
+
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ### ===== Test Database
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    ### === Create Tables
     for dbTables in database_tables:
         if not await db_conn_test.fetchval(getattr(pgCmds, dbTables['exists'])):
             await db_conn_test.execute(getattr(pgCmds, dbTables['create']))
             await aprint(f" {dbTables['log']}")
+            
+
+     ### ===== Create Functions
+    for dbfuncs in database_functions:
+        if not await db_conn_test.fetchval(getattr(pgCmds, dbfuncs['exists'])):
+            await db_conn_test.execute(getattr(pgCmds, dbfuncs['create']))
+            await aprint(f" {dbfuncs['log']}")
 
 
-
+    
     # ============================== BLOATED TEST CODE ==============================
+
+    
+    return True
+
+    data = {
+        'test1': {
+            'x': 5,
+            'y': 0,
+            'z': 5
+        }
+    }
+    
+    await db_conn_test.execute("UPDATE public.players SET world_data = $1::JSONB WHERE reso_id = $2", data, 'U-Calamity-Lime')
+
+
+    #testval = await db_conn_test.fetchval("SELECT hasWorldInfo($1, $2);", 'U-Calamity-Lime', 'test1')
+
+
+    testval = await db_conn_test.fetchval(pgCmds.EXISTS_WORLD_DATA, 'U-Calamity-Lime', 'test1')
+
+
+    print(testval)
+
+
+    xpos, ypos, zpos = (await db_conn_test.fetchval(pgCmds.FETCH_WORLD_DATA, 'U-Calamity-Lime', 'test1')).values()
+
+    print(xpos)
+    print(ypos)
+    print(zpos)
+
 
     data = {
         'horny_meadow': {
@@ -91,18 +150,22 @@ async def pgdb_setup_database() -> bool:
     #res = await db_conn.execute(ADD_MSG, "U-Medra", data, 20, 1)
 
     
-    ply_num, user, client, health, hit_multi, timestamp = await db_conn.fetchrow("SELECT * FROM public.player WHERE reso_id = CAST($1 AS VARCHAR)", "U-Medra")
+    #ply_num, user, client, health, hit_multi, timestamp = await db_conn.fetchrow("SELECT * FROM public.player WHERE reso_id = CAST($1 AS VARCHAR)", "U-Medra")
 
 
-    if 'horny_hill' not in client:
-        client['horny_hill'] = {'x' : 6, 'y' : 7, 'z' : 8}
+    #if 'horny_hill' not in client:
+    #    client['horny_hill'] = {'x' : 6, 'y' : 7, 'z' : 8}
         
-        await db_conn.execute("UPDATE public.player SET client_data = $1::JSONB WHERE reso_id = $2", client, 'U-Medra')
+    #    await db_conn.execute("UPDATE public.player SET client_data = $1::JSONB WHERE reso_id = $2", client, 'U-Medra')
 
-    print(client['horny_field']['x'])
+    #print(client['horny_field']['x'])
 
 
     await db_conn.close()
+
+
+    print("End test")
+    return False
 
 
     return True
@@ -126,9 +189,6 @@ async def main():
     except Exception as e:
         print(e)
         return
-
-    await aprint("test")
-
 
 
 

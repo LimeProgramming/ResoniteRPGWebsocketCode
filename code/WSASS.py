@@ -16,7 +16,7 @@ from concurrent.futures import TimeoutError as ConnectionTimeoutError
 
 # ~~~===== Custom lib imports =====~~~ #
 import dblogin
-from util import aprint
+from util import aprint, lprint, dprint
 from databasecmds import DatabaseCmds as pgCmds
 
 
@@ -155,6 +155,9 @@ class WebsocketServerAssignee:
         # Connect to the database
         await self.connect_to_db()
 
+        # Poor mans logging
+        await lprint("Client {} Connected".format(len(CONNECTIONS) + 1))
+
         # Spin off the listener to a continuously running task
         asyncio.get_event_loop().create_task(self.listener())
 
@@ -165,30 +168,43 @@ class WebsocketServerAssignee:
 
         try:
             async for message in self.websocket:
-                
-                # Split the message into COMMAND + ARGS
-                cmdpack = ((message).strip()).split('λ')
-                
-                # Test if the message received is valid 
-                if len(cmdpack) != 2 or cmdpack[0] not in VALIDRECCMDS.keys():
-                    continue
 
-                # Fetch the command from self
-                run_cmd = getattr(self, VALIDRECCMDS[cmdpack[0]], "Invalid")
+                await dprint(f"message {message}")
                 
+                # Test if the message received is valid + Split the message into COMMAND + ARGS
+                valid, command, args = await self.cmd_packet_analysis((message.strip()), delim='λ')
+
+                await dprint(f"ret {valid}, {command}, {args}")
+
+                # If it is not a valid command
+                if not valid or command not in VALIDRECCMDS.keys():
+                    continue
+                
+                # Fetch the command from self
+                run_cmd = getattr(self, VALIDRECCMDS[command], "Invalid")    
+
                 # Won't get here if the if is true but just in case
                 if run_cmd == "Invalid":
                     continue
                 
-                # Run the command
-                await run_cmd(cmdpack[1])
+                try: 
+                    # 5 Second Timeout
+                    async with asyncio.timeout(5):
+
+                        # Run the command
+                        await run_cmd(args)
                 
-        except (ValueError, TypeError):
-            await self.send('errorλValueTypeError')
-        
-        except PlayerLoadError:
-            await self.send("loadedplayerλerror")
+                except (ValueError, TypeError):
+                    await self.send('errorλValueTypeError')
                 
+                except PlayerLoadError:
+                    await self.send("loadedplayerλerror")
+                
+                except asyncio.TimeoutError:
+                    await self.send("loadedplayerλerror")
+                    await lprint(f"Timeout Error on: {VALIDRECCMDS[command]}")
+
+        # ===== Header Try     
         except websockets.exceptions.ConnectionClosed:
             await aprint(f'connection closed')
             await unregister_client(self)
@@ -206,6 +222,7 @@ class WebsocketServerAssignee:
         """Close the client connection and the database connection"""
 
         self.state = State.DISCONNECT
+
         try:
             # Close the database connection
             if self.db_conn: 
@@ -216,15 +233,21 @@ class WebsocketServerAssignee:
         except:
             traceback.print_exc()
 
-    
-    async def check_valid_packet(string, length=2) -> bool:
-        """Checks if the Command received is valid"""
+    async def cmd_packet_analysis(self, msg, length=2, delim=None) -> tuple:
+        """
+        Checks if the Command received is valid
+
+        Returns:
+            tuple: (is_valid (bool), command (str), argument (str))
+        """
         
-        pack = len(string.split('-'))
+        cmdpack = [x for x in msg.split(delim) if x]
 
-        return ((pack[0] in VALIDRECCMDS) and len(pack) == length)
-    
-
+        if len(cmdpack) == length:
+            return True, cmdpack[0], cmdpack[1] 
+        else:
+            return False, cmdpack[0], ''
+        
 
     # ============================== Database Commands ==============================
 
@@ -232,6 +255,7 @@ class WebsocketServerAssignee:
         """This the echo command, just send back what the client said"""
 
         await self.send(f"echoλ{args}")
+
         return
 
     async def run_cmd_saveplayer(self, args):
@@ -247,6 +271,8 @@ class WebsocketServerAssignee:
 
     async def run_cmd_loadplayer(self, player_id):
         """Read player data from database"""
+
+        await asyncio.sleep(10)
 
         # ===== If player does not exist, create them and return to Resonite with 
         if not await self.db_conn.fetchval(pgCmds.PLAYER_EXISTS, player_id):
@@ -265,32 +291,23 @@ class WebsocketServerAssignee:
             return
         
 
+        # ===== If world data is there, we must fetch it
+        if await self.db_conn.fetchval(pgCmds.EXISTS_WORLD_DATA, player_id, self.worldname):
+            xpos, ypos, zpos = (await self.db_conn.fetchval(pgCmds.FETCH_WORLD_DATA, player_id, self.worldname)).values()
 
-
-        wdata = await self.db_conn.fetchrow(pgCmds.FETCH_WORLD_DATA, player_id)
-
-        # ===== If world data for player does not exist, ask resonite for it
-        if wdata is None or self.worldname not in wdata:
-
+        # ===== Else world data for player does not exist, ask resonite for it
+        else:
             # === Send Resonite loadedplayer message 2
             await self.send(f"loadedplayerλ2λ{player_id}")
 
             # === Wait for response from Resonite
             data = await self.recv()
-            await aprint(data)
 
             # === X - Y - Z
             xpos, ypos, zpos = data.split(',')
 
-        # ===== Else there is data and we must fetch it
-        else:
-            xpos, ypos, zpos = wdata[self.worldname]
-
-
         
-
         # Maybe send player inventory here?
-
 
 
         # ===== Fetch the normal player data
@@ -330,7 +347,6 @@ async def register_client(websocket, _):
 
         await asyncio.sleep(0.001)
 
-
 async def unregister_client(connection):
     """Close a websocket client and remove from our connections set"""
 
@@ -352,6 +368,6 @@ async def ws_heartbeat():
             if connection.state == State.CONNECTED and connection.connection_type == ConnectionType.PRODUCTION:
                 await connection.send('heartbeat-heartbeat')
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(30)
 
 
