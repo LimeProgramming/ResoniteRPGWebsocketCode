@@ -101,38 +101,9 @@ async def pgdb_setup_database() -> bool:
 
     print(client['horny_field']['x'])
 
-    #client.keys()
 
-
-    # ============================== MESSAGES TABLE ==============================
-    CREATE_MSGS_TABLE =""" 
-        CREATE TABLE IF NOT EXISTS messages (
-            msg_id      BIGINT      PRIMARY KEY,
-            ch_id       BIGINT      NOT NULL,
-            guild_id    BIGINT      NOT NULL,
-            auth_id     BIGINT,
-            timestamp   TIMESTAMP   NOT NULL    DEFAULT (NOW() AT TIME ZONE 'utc'),
-            num         BIGSERIAL
-            ); 
-
-        COMMENT ON TABLE messages is             'This table stores some basic information about messages sent on the server. It keeps a log of messages which have been deleted from the guild.';
-        COMMENT ON COLUMN messages.msg_id is     'Discord id of the sent message.'; 
-        COMMENT ON COLUMN messages.ch_id is      'Channel id of the message was posted in.';
-        COMMENT ON COLUMN messages.guild_id is   'Note of the guild the message was posted in. Useful for API calls.';
-        COMMENT ON COLUMN messages.auth_id is    'Discord id of the messages sender.';
-        COMMENT ON COLUMN messages.timestamp is  'UTC timestamp of when the message was created.';
-        COMMENT ON COLUMN messages.num is        'The serial number of the message id sent.';
-        """ 
-    
-
-    #if not await db.fetchval(getattr(pgCmds, dbTables['exists'])):
-
-    await db_conn.execute(CREATE_MSGS_TABLE)
     await db_conn.close()
 
-    #await aprint("end of test")
-
-    #return False
 
     return True
 
@@ -148,7 +119,7 @@ async def pgdb_setup_database() -> bool:
 async def main():
 
 
-    # ---------- CONNECT TO AND PRIME THE POSTGRE DATABASE ----------
+    # ---------- CONNECT TO AND PRIME THE POSTGRESQL DATABASE ----------
     try:
         if not (await pgdb_setup_database()):
             return
