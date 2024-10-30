@@ -155,6 +155,8 @@ class WebsocketServerAssignee:
     async def listener(self):
         """This is our main listener thread for our clients"""
 
+        #valid, command, args = [None, None, None]
+
         try:
             async for message in self.websocket:
 
@@ -178,7 +180,7 @@ class WebsocketServerAssignee:
                 
                 try: 
                     # 5 Second Timeout
-                    async with asyncio.timeout(5):
+                    async with asyncio.timeout(1):
 
                         # Run the command
                         await run_cmd(args)
@@ -187,10 +189,12 @@ class WebsocketServerAssignee:
                     await self.send('errorλValueTypeError')
                 
                 except PlayerLoadError:
-                    await self.send("loadedplayerλerror")
+                    await self.send("errorλ1λerror")
+                    #await self.send("loadedplayerλ10λeerror")
                 
                 except asyncio.TimeoutError:
-                    await self.send("loadedplayerλerror")
+                    await self.send("errorλ1λerror")
+                    #await self.send("loadedplayerλ10λeerror")
                     await lprint(f"Timeout Error on: {VALIDRECCMDS[command]}")
 
         # ===== Header Try     
@@ -204,8 +208,15 @@ class WebsocketServerAssignee:
             
 
 
-
     # ============================== RPG Loader Commands ==============================
+    
+    async def run_cmd_echo(self, args):
+        """This the echo command, just send back what the client said"""
+
+        await self.send(f"echoλ{args}")
+
+        return
+
 
     async def run_cmd_saveplayer(self, args):
         """Save player data to database"""
@@ -218,19 +229,11 @@ class WebsocketServerAssignee:
 
         return
 
-    
-    async def run_cmd_echo(self, args):
-        """This the echo command, just send back what the client said"""
-
-        await self.send(f"echoλ{args}")
-
-        return
-
 
     async def run_cmd_loadplayer(self, player_id):
         """Read player data from database"""
 
-        await asyncio.sleep(10)
+       # await asyncio.sleep(10)
 
         # ===== If player does not exist, create them and return to Resonite with 
         if not await self.db_conn.fetchval(pgCmds.PLAYER_EXISTS, player_id):
