@@ -104,8 +104,50 @@ async def pgdb_setup_database() -> bool:
     # ============================== BLOATED TEST CODE ==============================
 
     
-    return True
+    return True   
 
+    #test_data = """[{"UUID": "c-6470b785-9358-49dc-a852-72efdf1db046", "elements": [{"UUID": "c-0557cec6-451c-45e4-8934-3f3fedc21d5b", "elements": [{"UUID": "I-58aa5374-59eb-4e7c-a8ef-6c0da03e5232", "data": {"Float1": 5.5556 ,"test": false ,"test3": false }},{"UUID": "i-206a9122-5537-4c33-a5ce-a0639a22f531", "data": {"gggg": false ,"hhhh": "hhyy" ,"hhyy": "" ,"ggggg": "jgjgjgjg" }},{"UUID": "I-49711bda-c2fc-4b6e-a4b7-07fded56421f", "data": {}},{"UUID": "I-82864ef2-3972-4f30-8223-7932ba0f1862", "data": {}}]}, {"UUID": "c-8eaec9b5-1926-4543-9688-0d3797d6422e", "elements": [{"UUID": "I-c6900b63-f084-4000-8d89-6479455fbe00", "data": {}}]}, {"UUID": "c-6bea58b3-38ff-4c86-8d8c-74fc8cdf2d4b", "elements": [{"UUID": "I-38e18230-b1c0-4edd-9070-caac44d89c94", "data": {}}]}]},{"UUID": "c-8ff528de-22d3-4062-b943-e73a2482cad9", "elements": [{"UUID": "c-c12fb0ef-0cb7-4791-ba93-63783d745306", "elements": [{"UUID": "I-bc913285-9f3d-4070-850e-90d4fd65a473", "data": {}}]}, {"UUID": "c-58ae3fe6-3576-4b83-b12f-269c1e3cd590", "elements": [{"UUID": "I-f86d06f3-6549-4799-85bd-d9f2fd640db9", "data": {}}]}]},{"UUID": "c-e437ad2d-bd54-4dd3-8c9b-af65e9f2eb0c", "elements": [{"UUID": "I-ea04827f-d271-4b85-91a5-fee2cba2e6f5", "data": {}}]}]"""
+
+    #test_dict = json.loads(test_data)
+
+    #await db_conn_test.execute("UPDATE public.players SET inventory = $1::JSONB WHERE reso_id = $2", test_dict, 'U-Calamity-Lime')
+
+
+    records = await db_conn_test.fetch(pgCmds.FETCH_INV_ITEMS, 'U-Calamity')
+
+    #<Record uuid='c-0557cec6-451c-45e4-8934-3f3fedc21d5b' elements=
+    #   [
+    #       {'UUID': 'I-58aa5374-59eb-4e7c-a8ef-6c0da03e5232', 'data': {'test': False, 'test3': False, 'Float1': 5.5556}}, 
+    #       {'UUID': 'i-206a9122-5537-4c33-a5ce-a0639a22f531', 'data': {'gggg': False, 'hhhh': 'hhyy', 'hhyy': '', 'ggggg': 'jgjgjgjg'}}, 
+    #       {'UUID': 'I-49711bda-c2fc-4b6e-a4b7-07fded56421f', 'data': {}}, 
+    #       {'UUID': 'I-82864ef2-3972-4f30-8223-7932ba0f1862', 'data': {}}
+    #   ]>
+
+    #print(len(records))
+
+
+
+    data = ''
+
+    for record in records:
+
+        for item in record['elements']:
+            data = ''
+
+            if len(item['data']) > 0:
+                data = ':>'.join([f'{key}:~{value}' for key, value in item['data'].items()])
+
+            print(':¬'.join([record['uuid'], item['UUID'], data]))
+
+            
+
+
+
+#children_uuids = ",".join(child['UUID'] for child in record['elements'])
+
+    print("End test")
+    return False
+    
     data = {
         'test1': {
             'x': 5,
@@ -121,6 +163,12 @@ async def pgdb_setup_database() -> bool:
 
 
     testval = await db_conn_test.fetchval(pgCmds.EXISTS_WORLD_DATA, 'U-Calamity-Lime', 'test1')
+
+    await db_conn.close()
+
+
+    print("End test")
+    return False
 
 
     print(testval)

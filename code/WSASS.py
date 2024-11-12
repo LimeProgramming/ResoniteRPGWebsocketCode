@@ -160,12 +160,12 @@ class WebsocketServerAssignee:
         try:
             async for message in self.websocket:
 
-                await dprint(f"message {message}")
+                #await dprint(f"message {message}")
                 
                 # Test if the message received is valid + Split the message into COMMAND + ARGS
                 valid, command, args = await self.cmd_packet_analysis((message.strip()), delim='λ')
 
-                await dprint(f"ret {valid}, {command}, {args}")
+                #await dprint(f"ret {valid}, {command}, {args}")
 
                 # If it is not a valid command
                 if not valid or command not in VALIDRECCMDS.keys():
@@ -233,33 +233,34 @@ class WebsocketServerAssignee:
     async def run_cmd_loadplayer(self, player_id):
         """Read player data from database"""
 
-       # await asyncio.sleep(10)
+        # ====================
+        # Load player Step 1
+        # Test if player exists in Database and Create them if not
 
         # ===== If player does not exist, create them and return to Resonite with 
         if not await self.db_conn.fetchval(pgCmds.PLAYER_EXISTS, player_id):
 
             # === If the reso ID is not formatted correctly
-            if not (player_id.lower()).startswith('u-'):
+            if not (player_id).startswith('U-'):
                 raise PlayerLoadError
 
             # === Create player
             await self.db_conn.execute(pgCmds.CREATE_PLAYER, player_id) 
-
-            # === Tell resonite that we have created a player
-            await self.send(f"loadedplayerλ1λ{player_id}")
-
-            # === Return to Resonite 
-            return
         
 
+
+        # ====================
+        # Load player Step 2
+        # Does player have any world data? Fetch from Resonite if not
+
         # ===== If world data is there, we must fetch it
-        if await self.db_conn.fetchval(pgCmds.EXISTS_WORLD_DATA, player_id, self.worldname):
-            xpos, ypos, zpos = (await self.db_conn.fetchval(pgCmds.FETCH_WORLD_DATA, player_id, self.worldname)).values()
+        if await self.db_conn.fetchval(pgCmds.EXISTS_PLAYER_WORLD_DATA, player_id, self.worldname):
+            xpos, ypos, zpos = (await self.db_conn.fetchval(pgCmds.FETCH_PLAYER_WORLD_DATA, player_id, self.worldname)).values()
 
         # ===== Else world data for player does not exist, ask resonite for it
         else:
             # === Send Resonite loadedplayer message 2
-            await self.send(f"loadedplayerλ2λ{player_id}")
+            await self.send(f"loadedplayerλ1λ{player_id}")
 
             # === Wait for response from Resonite
             data = await self.recv()
@@ -268,8 +269,43 @@ class WebsocketServerAssignee:
             xpos, ypos, zpos = data.split(',')
 
         
-        # Maybe send player inventory here?
 
+        # ====================
+        # Load player Step 3
+        # Set up Player Inventory
+
+        # ===== Tell resonite to generate a blank inventory
+        await self.send(f"loadedplayerλ2λ")
+
+        bangbang = await self.recv()
+
+        bangbang = (bangbang.strip()).lower()
+
+        if bangbang == "error":
+            return #ToDo Error Handling
+
+
+        # ===== Fetch Player inventory items from Websocket
+        # Data comes in with the Parent Class, Item ID and Item data
+
+        records = await self.db_conn.fetch(pgCmds.FETCH_INV_ITEMS, player_id)
+
+        if len(records) > 0:
+
+            for record in records:
+
+                for item in record['elements']:
+                    data = ''
+
+                    if len(item['data']) > 0:
+                        data = ':>'.join([f'{key}:~{value}' for key, value in item['data'].items()])
+
+                    await self.send(f"loadedplayerλ3λ{':¬'.join([record['uuid'], item['UUID'], data])}")
+
+                    
+        # ====================
+        # Load player Step 4
+        # Fetch and Send Player Data
 
         # ===== Fetch the normal player data
         ply_name, ply_profession, pre_world, max_health, health, hit_multi, level, agility = await self.db_conn.fetchrow(pgCmds.FETCH_PLAYER_DATA, player_id)
@@ -280,7 +316,7 @@ class WebsocketServerAssignee:
         hit_multi = round(hit_multi,4)
 
         # ===== Send Player Data
-        await self.send(f"loadedplayerλ3λ{player_id},{ply_name},{ply_profession},{pre_world},[{xpos};{ypos};{zpos}],{max_health},{health},{hit_multi},{agility},{level}")
+        await self.send(f"loadedplayerλ4λ{player_id},{ply_name},{ply_profession},{pre_world},[{xpos};{ypos};{zpos}],{max_health},{health},{hit_multi},{agility},{level}")
 
         return
 

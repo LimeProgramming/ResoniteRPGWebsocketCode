@@ -10,7 +10,7 @@ _user = 'websock'
 _pwrd = '12345678'
 _name = 'neos2' 
 _nametest = 'neos2_test'
-_host = '192.168.1.12'
+_host = '192.168.1.10'
 _port = 5432
 
 
