@@ -236,6 +236,7 @@ class WebsocketServerAssignee:
             await self.db_conn.execute(pgCmds.CREATE_PLAYER, player_id) 
         
 
+
         # ====================
         # Save player Step 2
         # Save World Data
@@ -255,30 +256,66 @@ class WebsocketServerAssignee:
             await eprint(f"Error parsing Player Data: {ret}")
             return #ToDo Error Handling
         
+        # ===== Handle writing world specific data back to the database
+        playerWorldData = {}
+
+        # If this world has data in the database, fetch it
+        if (await self.db_conn.fetchval(pgCmds.EXISTS_PLAYER_ANY_WORLD_DATA, player_id)):
+            playerWorldData = await self.db_conn.fetch(pgCmds.FETCH_PLAYER_ALL_WORLD_DATA, player_id)
+
+        # Update field with new data
+        playerWorldData[self.worldname] = retdict['Position']
+
+
+        
+
+        # ====================
+        # Save player Step 3
+        # Save Player Inventory
+
+        # ===== Tell Resonite to serialise the players inventory
+        await self.send(f"saveplayerλ2λ{player_id}")
+
+        # ===== await Resonite sending us the players inventory
+        rawplayerinv = await self.recv()
+
+
+        # ===== Try to load the data from Resonite as a data dictionary with Json.loads
+        # If this errors it means the data we got from Resonite is Faulty
+        # If this errors, We tell Resonite to Sanitize the players inventory and resend
+
+        try:
+            playerinvdict = json.loads(rawplayerinv)
+        except ValueError:
+
+            # === Tell Resonite to Sanitize the Players Inventory
+            await self.send(f"saveplayerλ3λ{player_id}")
+
+            # === Wait for Resonite to resend us the Players Inventory
+            rawplayerinv = await self.recv()
+
+            try:
+                playerinvdict = json.loads(rawplayerinv)
+
+            except ValueError:
+
+                await eprint(f"Error parsing Player Inventory: {rawplayerinv}")
+                return #ToDo Error Handling
+        
+
+
+        # ====================
+        # Save player Step 4
+        # Commit To Database
 
         # ===== Write the bulk of the world data to the database
         await self.db_conn.execute(pgCmds.STORE_PLAYER_DATA, retdict['Player_Name'], retdict['Player_Profession'], retdict['Player_Level'], retdict['Max_Health'], retdict['Health'], retdict['Hit_Multi'], retdict['Agility'], self.worldname)
 
-        
-        playerWorldData = {}
-
-        if (await self.db_conn.fetchval(pgCmds.EXISTS_PLAYER_ANY_WORLD_DATA, player_id)):
-            playerWorldData = await self.db_conn.fetch(pgCmds.FETCH_PLAYER_ALL_WORLD_DATA, player_id)
-
-        playerWorldData[self.worldname] = retdict['Position']
-
+        # ===== Commit World Data to Database
         await self.db_conn.execute(pgCmds.STORE_PLAYER_WORLD_DATA, player_id, playerWorldData)
-        
-        # ====================
 
-        try:
-            #test the data we just got in from resonite
-            json.loads('intentionally bad data')
-        except ValueError:
-            await self.db_conn.send('saveplayer')
-            # send msg to resonite to sanitise the players inventory
-
-        #test = await self.db_conn.execute(pgCmds.STORE_PLAYER_INVENTORY, 'U-Test', "intentionally bad data")
+        # ===== Commit Player inventory to Database
+        await self.db_conn.execute(pgCmds.STORE_PLAYER_INVENTORY, player_id, playerinvdict)
         
         return
 
