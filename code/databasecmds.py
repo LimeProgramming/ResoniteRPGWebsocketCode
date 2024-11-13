@@ -185,6 +185,8 @@ class DatabaseCmds(object):
 
 
 
+
+
     FETCH_PLAYER_ALL =          "SELECT * FROM public.players WHERE reso_id = CAST($1 AS VARCHAR);"
 
 

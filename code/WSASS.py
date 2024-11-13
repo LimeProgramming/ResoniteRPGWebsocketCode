@@ -279,7 +279,6 @@ class WebsocketServerAssignee:
         # ===== await Resonite sending us the players inventory
         rawplayerinv = await self.recv()
 
-
         # ===== Try to load the data from Resonite as a data dictionary with Json.loads
         # If this errors it means the data we got from Resonite is Faulty
         # If this errors, We tell Resonite to Sanitize the players inventory and resend
@@ -339,6 +338,7 @@ class WebsocketServerAssignee:
         
 
 
+
         # ====================
         # Load player Step 2
         # Does player have any world data? Fetch from Resonite if not
@@ -392,6 +392,7 @@ class WebsocketServerAssignee:
 
                     await self.send(f"loadedplayerλ3λ{':¬'.join([record['uuid'], item['UUID'], data])}")
 
+                    
                     
         # ====================
         # Load player Step 4
