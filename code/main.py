@@ -111,9 +111,20 @@ async def pgdb_setup_database() -> bool:
     #test_dict = json.loads(test_data)
 
     #await db_conn_test.execute("UPDATE public.players SET inventory = $1::JSONB WHERE reso_id = $2", test_dict, 'U-Calamity-Lime')
+    
 
+    try:
+        #test the data we just got in from resonite
+        json.loads('intentionally bad data')
+    except ValueError:
+        jkhlkjh
+        # send msg to resonite to sanitise the players inventory
 
-    records = await db_conn_test.fetch(pgCmds.FETCH_INV_ITEMS, 'U-Calamity')
+    test = await db_conn_test.execute(pgCmds.STORE_PLAYER_INVENTORY, 'U-Test', "intentionally bad data")
+    print(test)
+
+    return False
+    records = await db_conn_test.fetch(pgCmds.FETCH_INV_ITEMS, 'U-Calamity-Lime')
 
     #<Record uuid='c-0557cec6-451c-45e4-8934-3f3fedc21d5b' elements=
     #   [

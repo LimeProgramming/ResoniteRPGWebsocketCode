@@ -47,3 +47,14 @@ async def dprint(message):
     await asyncio.to_thread(safe_print, f"[DEBUG] {message}")
 
     return
+
+
+async def eprint(message):
+    """Poor mans Error message"""
+
+    if not isinstance(message, str):
+        message = str(message)
+
+    await asyncio.to_thread(safe_print, f"[ERROR] {message}")
+
+    return

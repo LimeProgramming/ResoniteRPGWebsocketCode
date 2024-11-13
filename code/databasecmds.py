@@ -85,21 +85,50 @@ class DatabaseCmds(object):
 
     FETCH_PLAYER_DATA = """
         SELECT  
-            ply_name, ply_profession, pre_world, max_health, health, hit_multi, ply_lvl, agility 
+            ply_name, 
+            ply_profession,
+            ply_lvl,
+            max_health,
+            health,
+            hit_multi,
+            agility,
+            pre_world
+
         FROM public.players
         WHERE 
             reso_id = CAST($1 AS VARCHAR)
     """
 
+    STORE_PLAYER_DATA = """
+        UPDATE
+            public.players
+        SET
+            ply_name            =  CAST($2 AS VARCHAR),
+            ply_profession      =  CAST($3 AS VARCHAR),
+            ply_lvl             =  CAST($4 AS VARCHAR),
+            max_health          =  CAST($5 AS REAL),
+            health              =  CAST($6 AS REAL),
+            hit_multi           =  CAST($7 AS REAL),
+            agility             =  CAST($8 AS REAL),
+            pre_world           =  CAST($9 AS VARCHAR)
+        WHERE
+            reso_id = CAST($1 AS VARCHAR);
+
+    """
 
 
-    EXISTS_PLAYER_WORLD_DATA =         "SELECT hasWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+    # ===== Player world data field
+    EXISTS_PLAYER_ANY_WORLD_DATA =     "SELECT EXISTS(SELECT 1 FROM public.players WHERE reso_id = CAST($1 AS VARCHAR) AND world_data != '{}'::jsonb);"
 
-    FETCH_PLAYER_WORLD_DATA =          "SELECT getWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+    EXISTS_PLAYER_THIS_WORLD_DATA =    "SELECT hasWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+
+    FETCH_PLAYER_THIS_WORLD_DATA =     "SELECT getWorldInfo(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR));"
+
+    FETCH_PLAYER_ALL_WORLD_DATA =      "SELECT world_data FROM public.players WHERE reso_id = CAST($1 AS VARCHAR);"
 
     STORE_PLAYER_WORLD_DATA = """
         UPDATE
-            players
+            public.players
         SET
             world_data = CAST($2 AS jsonb)
         WHERE
@@ -107,13 +136,47 @@ class DatabaseCmds(object):
     """
 
 
+    # ===== Player inventory data
     EXISTS_PLAYER_INVENTORY =           "SELECT EXISTS(SELECT 1 FROM public.players WHERE reso_id = CAST($1 AS VARCHAR) AND inventory != '{}'::jsonb);"
 
-    FETCH_PLAYER_INVENTORY =            "SELECT inventory FROM public.players WHERE reso_id = CAST($1 as VARCHAR);"
+    FETCH_PLAYER_INVENTORY_RAW =        "SELECT inventory FROM public.players WHERE reso_id = CAST($1 as VARCHAR);"
 
-    STORE_PLAYER_WORLD_DATA = """
+    FETCH_PLAYER_INVENTORY_ITEMS = """
+        WITH RECURSIVE elements_tree AS (
+            -- Initial query to find the top-level element within the inventory array with a UUID that matches the given UUID
+            SELECT 
+                jsonb_array_elements(inventory) AS element
+            FROM 
+                public.players
+            WHERE 
+                reso_id = CAST($1 AS VARCHAR)
+            
+            UNION ALL
+            
+            -- Recursive part to iterate over "elements" within each matching element
+            SELECT 
+                jsonb_array_elements(elements_tree.element->'elements') AS element
+            FROM 
+                elements_tree
+        )
+        -- Final selection to get UUID and nested elements of each child
+        SELECT 
+            element->>'UUID' AS UUID,
+            element->'elements' as ELEMENTS
+        FROM 
+            elements_tree
+        WHERE
+            LOWER(element->>'UUID') NOT LIKE 'i-%' AND
+            NOT EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(element->'elements') AS child
+                WHERE LOWER(child->>'UUID') LIKE 'c-%'  -- Exclude if any child doesn't start with 'i-'
+            );
+    """
+
+    STORE_PLAYER_INVENTORY = """
         UPDATE
-            players
+            public.players
         SET
             inventory = CAST($2 AS jsonb)
         WHERE
@@ -125,17 +188,9 @@ class DatabaseCmds(object):
     FETCH_PLAYER_ALL =          "SELECT * FROM public.players WHERE reso_id = CAST($1 AS VARCHAR);"
 
 
-    STORE_PLAYER_INVENTORY = """
-        UPDATE 
-            players
-        SET
-            inventory = CAST($2 AS jsonb)
-        WHERE
-            reso_id = CAST($1 AS VARCHAR);
-    """
 
 
-
+    # ===== Player DEBUG commands
     DEBUG_RESET_PLAYER = """
         UPDATE players
         SET
@@ -226,36 +281,3 @@ class DatabaseCmds(object):
 
 
 
-    # ---------------
-    FETCH_INV_ITEMS = """
-    WITH RECURSIVE elements_tree AS (
-        -- Initial query to find the top-level element within the inventory array with a UUID that matches the given UUID
-        SELECT 
-            jsonb_array_elements(inventory) AS element
-        FROM 
-            players
-        WHERE 
-            reso_id = CAST($1 AS VARCHAR)
-        
-        UNION ALL
-        
-        -- Recursive part to iterate over "elements" within each matching element
-        SELECT 
-            jsonb_array_elements(elements_tree.element->'elements') AS element
-        FROM 
-            elements_tree
-    )
-    -- Final selection to get UUID and nested elements of each child
-    SELECT 
-        element->>'UUID' AS UUID,
-        element->'elements' as ELEMENTS
-    FROM 
-        elements_tree
-    WHERE
-        LOWER(element->>'UUID') NOT LIKE 'i-%' AND
-        NOT EXISTS (
-            SELECT 1
-            FROM jsonb_array_elements(element->'elements') AS child
-            WHERE LOWER(child->>'UUID') LIKE 'c-%'  -- Exclude if any child doesn't start with 'i-'
-        );
-    """
