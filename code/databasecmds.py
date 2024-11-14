@@ -105,7 +105,7 @@ class DatabaseCmds(object):
         SET
             ply_name            =  CAST($2 AS VARCHAR),
             ply_profession      =  CAST($3 AS VARCHAR),
-            ply_lvl             =  CAST($4 AS VARCHAR),
+            ply_lvl             =  CAST($4 AS SMALLINT),
             max_health          =  CAST($5 AS REAL),
             health              =  CAST($6 AS REAL),
             hit_multi           =  CAST($7 AS REAL),

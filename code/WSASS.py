@@ -74,7 +74,21 @@ class WebsocketServerAssignee:
 
         try:
             message = await self.websocket.recv()
+
+            await dprint(message)
+
             return message
+        
+        except asyncio.exceptions.CancelledError:
+
+            async for msg in self.websocket:
+                message = msg
+                break
+            
+            await dprint(message)
+            
+            return message
+        
         except:
             traceback.print_exc()
 
@@ -160,12 +174,12 @@ class WebsocketServerAssignee:
         try:
             async for message in self.websocket:
 
-                #await dprint(f"message {message}")
+                await dprint(f"message {message}")
                 
                 # Test if the message received is valid + Split the message into COMMAND + ARGS
                 valid, command, args = await self.cmd_packet_analysis((message.strip()), delim='λ')
 
-                #await dprint(f"ret {valid}, {command}, {args}")
+                await dprint(f"ret {valid}, {command}, {args}")
 
                 # If it is not a valid command
                 if not valid or command not in VALIDRECCMDS.keys():
@@ -185,7 +199,8 @@ class WebsocketServerAssignee:
                         # Run the command
                         await run_cmd(args)
                 
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as E:
+                    print(E)
                     await self.send('errorλValueTypeError')
                 
                 except PlayerLoadError:
@@ -224,7 +239,7 @@ class WebsocketServerAssignee:
         # ====================
         # Save player Step 1
         # Test if player exists in Database and Create them if not
-
+        
         # ===== If player does not exist, create them and return to Resonite with 
         if not await self.db_conn.fetchval(pgCmds.PLAYER_EXISTS, player_id):
 
@@ -261,13 +276,12 @@ class WebsocketServerAssignee:
 
         # If this world has data in the database, fetch it
         if (await self.db_conn.fetchval(pgCmds.EXISTS_PLAYER_ANY_WORLD_DATA, player_id)):
-            playerWorldData = await self.db_conn.fetch(pgCmds.FETCH_PLAYER_ALL_WORLD_DATA, player_id)
+            playerWorldData = await self.db_conn.fetchval(pgCmds.FETCH_PLAYER_ALL_WORLD_DATA, player_id)
 
         # Update field with new data
         playerWorldData[self.worldname] = retdict['Position']
 
 
-        
 
         # ====================
         # Save player Step 3
@@ -308,13 +322,16 @@ class WebsocketServerAssignee:
         # Commit To Database
 
         # ===== Write the bulk of the world data to the database
-        await self.db_conn.execute(pgCmds.STORE_PLAYER_DATA, retdict['Player_Name'], retdict['Player_Profession'], retdict['Player_Level'], retdict['Max_Health'], retdict['Health'], retdict['Hit_Multi'], retdict['Agility'], self.worldname)
+        await self.db_conn.execute(pgCmds.STORE_PLAYER_DATA, player_id, retdict['Player_Name'], retdict['Player_Profession'], retdict['Player_Level'], retdict['Max_Health'], retdict['Health'], retdict['Hit_Multi'], retdict['Agility'], self.worldname)
 
         # ===== Commit World Data to Database
         await self.db_conn.execute(pgCmds.STORE_PLAYER_WORLD_DATA, player_id, playerWorldData)
 
         # ===== Commit Player inventory to Database
         await self.db_conn.execute(pgCmds.STORE_PLAYER_INVENTORY, player_id, playerinvdict)
+
+        # ===== Tell Resonite that we're done saving player data
+        await self.send(f"saveplayerλ4λ{player_id}")
         
         return
 
@@ -393,7 +410,7 @@ class WebsocketServerAssignee:
                     await self.send(f"loadedplayerλ3λ{':¬'.join([record['uuid'], item['UUID'], data])}")
 
                     
-                    
+
         # ====================
         # Load player Step 4
         # Fetch and Send Player Data
