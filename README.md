@@ -13,4 +13,9 @@ You need two postgre databases to try this out running on a host, put the data i
 
 # Read-Only License
 
-You are permitted to view the contents of this repository for informational and educational purposes only. No permission is granted to copy, modify, distribute, or use the code in any derivative works or commercial applications. All rights are reserved by the author.
+This repository is provided for informational and educational purposes.
+
+* You may modify and distribute derivative works based on the code, provided they are not used in commercial applications.
+* Use of the code in its unmodified state is not permitted.
+
+Disclaimer: This is an early, unfinished proof-of-concept implementation. While it may offer value to others, no guarantees are made regarding its functionality or suitability for any particular purpose.<br>***Use at your own risk***.
